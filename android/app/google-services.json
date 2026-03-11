@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "673256708614",
+    "project_id": "paint-inventory-management",
+    "storage_bucket": "paint-inventory-management.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:673256708614:android:655b53b4679267e8e60187",
+        "android_client_info": {
+          "package_name": "com.example.paint_inventory_management"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCtnJF5cvzL0mtY83HQTYWGJTWalcrmTOU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
