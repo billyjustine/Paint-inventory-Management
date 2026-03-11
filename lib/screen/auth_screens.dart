@@ -14,15 +14,50 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController emailCtrl = TextEditingController();
   final TextEditingController passCtrl = TextEditingController();
   bool isLoading = false;
+Future<void> login() async {
+    if (emailCtrl.text.isEmpty || passCtrl.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("Please enter both email and password."), 
+          backgroundColor: Colors.red));
+      return;
+    }
 
-  Future<void> login() async {
     setState(() => isLoading = true);
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(email: emailCtrl.text.trim(), password: passCtrl.text.trim());
-      if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DashboardScreen()));
+      // 1. Log the user in
+      UserCredential cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
+          email: emailCtrl.text.trim(), 
+          password: passCtrl.text.trim()
+      );
+      
+      // 2. Quickly grab their name from the database
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(cred.user!.uid).get();
+      
+      String userName = "Staff"; 
+      if (userDoc.exists && userDoc.data() != null) {
+        var data = userDoc.data() as Map<String, dynamic>;
+        userName = data.containsKey('name') ? data['name'] : "Staff";
+      }
+      
+      if (mounted) {
+        // --- THE LOGIN SUCCESS MESSAGE ---
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Login Success! Welcome, $userName.", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+            backgroundColor: Colors.green, // Makes the banner green for success
+            behavior: SnackBarBehavior.floating, // Makes it float above the bottom edge
+            duration: const Duration(seconds: 2), // Disappears quickly so it isn't annoying
+          )
+        );
+
+        // 3. Send them to the Dashboard
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DashboardScreen()));
+      }
     } catch (e) {
       setState(() => isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Login Failed"), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("Login Failed. Please check your credentials."), 
+          backgroundColor: Colors.red));
     }
   }
 
@@ -36,7 +71,7 @@ class _LoginScreenState extends State<LoginScreen> {
             children: [
               const Icon(Icons.inventory, size: 80, color: Color(0xFF1A237E)),
               const SizedBox(height: 20),
-              const Text("SYSTEM LOGIN", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1A237E))),
+              const Text(" Paint Inventory Management", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1A237E))),
               const SizedBox(height: 20),
               TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: "Email", border: OutlineInputBorder())),
               const SizedBox(height: 15),
@@ -45,7 +80,7 @@ class _LoginScreenState extends State<LoginScreen> {
               isLoading ? const CircularProgressIndicator() : ElevatedButton(
                 style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A237E), minimumSize: const Size.fromHeight(50)),
                 onPressed: login, 
-                child: const Text("ACCESS SYSTEM", style: TextStyle(color: Colors.white)),
+                child: const Text("LOGIN", style: TextStyle(color: Colors.white,fontSize: 20)),
               ),
               TextButton(
                 onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
@@ -76,23 +111,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> register() async {
     if (emailCtrl.text.isEmpty || passCtrl.text.length < 6) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields. Password must be 6+ chars."), backgroundColor: Colors.red));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text("Please fill all fields. Password must be 6+ chars."),
+          backgroundColor: Colors.red));
       return;
     }
 
     setState(() => isLoading = true);
     try {
-      UserCredential cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(email: emailCtrl.text.trim(), password: passCtrl.text.trim());
+      // 1. Create the account in Firebase Auth
+      UserCredential cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+          email: emailCtrl.text.trim(), 
+          password: passCtrl.text.trim()
+      );
+      
+      // 2. Save the user's role and details to Firestore
       await FirebaseFirestore.instance.collection('users').doc(cred.user!.uid).set({
-        'uid': cred.user!.uid, 'name': nameCtrl.text.trim(), 'email': emailCtrl.text.trim(), 'role': role,
+        'uid': cred.user!.uid,
+        'name': nameCtrl.text.trim(),
+        'email': emailCtrl.text.trim(),
+        'role': role,
       });
-      if (mounted) Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+      
+      if (mounted) {
+        // --- NEW: Display the Success Message! ---
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text("Registration Successful! You can now log in.", style: TextStyle(fontWeight: FontWeight.bold)), 
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating, // Makes it pop up slightly above the bottom
+          )
+        );
+        
+        // 3. Send them to the Login Screen
+        Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
+      }
     } catch (e) {
       setState(() => isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
     }
   }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(

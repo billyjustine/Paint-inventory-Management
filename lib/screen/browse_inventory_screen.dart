@@ -3,17 +3,68 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class BrowseInventoryScreen extends StatelessWidget {
-  final bool isAdmin; // --- NEW: Tells the screen if the user is an Admin ---
+  final bool isAdmin; 
 
   const BrowseInventoryScreen({super.key, required this.isAdmin});
 
+  Color _hexToColor(String hexString) {
+    final buffer = StringBuffer();
+    if (hexString.length == 6 || hexString.length == 7) buffer.write('ff');
+    buffer.write(hexString.replaceFirst('#', ''));
+    try {
+      return Color(int.parse(buffer.toString(), radix: 16));
+    } catch (e) {
+      return Colors.grey; 
+    }
+  }
+
+  // --- NEW: Function to handle Admin Restocking ---
+  void _handleRestock(BuildContext context, DocumentSnapshot paintDoc) {
+    final TextEditingController qtyController = TextEditingController();
+    
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text("Restock: ${paintDoc['name']}"),
+        content: TextField(
+          controller: qtyController, 
+          keyboardType: TextInputType.number, 
+          decoration: const InputDecoration(labelText: "How many units arrived?")
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+            onPressed: () async {
+              int qty = int.tryParse(qtyController.text) ?? 0;
+              if (qty <= 0) return;
+
+              int currentStock = paintDoc['currentStock'] ?? 0;
+
+              // Add the new delivery to the current stock
+              await FirebaseFirestore.instance.collection('paints').doc(paintDoc.id).update({
+                'currentStock': currentStock + qty
+              });
+              
+              if (context.mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Warehouse restocked successfully!"), backgroundColor: Colors.green));
+              }
+            },
+            child: const Text("Add Inventory", style: TextStyle(color: Colors.white)),
+          )
+        ],
+      ),
+    );
+  }
+
+  // Existing Checkout / Request Logic
   void _handlePaintAction(BuildContext context, DocumentSnapshot paintDoc) {
     final TextEditingController qtyController = TextEditingController();
     
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        // Changes the title based on role
         title: Text(isAdmin ? "Admin Checkout: ${paintDoc['name']}" : "Request: ${paintDoc['name']}"),
         content: TextField(
           controller: qtyController, 
@@ -28,13 +79,17 @@ class BrowseInventoryScreen extends StatelessWidget {
               int qty = int.tryParse(qtyController.text) ?? 0;
               if (qty <= 0) return;
 
+              int currentStock = paintDoc['currentStock'] ?? 0;
+
+              if (qty > currentStock) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text("Only $currentStock units available!"), 
+                  backgroundColor: Colors.red
+                ));
+                return;
+              }
+
               if (isAdmin) {
-                // --- ADMIN LOGIC: Instantly deduct the stock ---
-                int currentStock = paintDoc['currentStock'] ?? 0;
-                if (currentStock < qty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Not enough stock!"), backgroundColor: Colors.red));
-                  return;
-                }
                 await FirebaseFirestore.instance.collection('paints').doc(paintDoc.id).update({
                   'currentStock': currentStock - qty
                 });
@@ -43,7 +98,6 @@ class BrowseInventoryScreen extends StatelessWidget {
                   ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Stock directly updated!"), backgroundColor: Colors.green));
                 }
               } else {
-                // --- USER LOGIC: Send a Pending Request ---
                 await FirebaseFirestore.instance.collection('requests').add({
                   'paintId': paintDoc.id,
                   'paintName': paintDoc['name'],
@@ -58,7 +112,6 @@ class BrowseInventoryScreen extends StatelessWidget {
                 }
               }
             },
-            // Changes the button text based on role
             child: Text(isAdmin ? "Deduct Stock" : "Send to Admin", style: const TextStyle(color: Colors.white)),
           )
         ],
@@ -69,7 +122,7 @@ class BrowseInventoryScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Warehouse Stock"), backgroundColor: const Color(0xFF1A237E), foregroundColor: Colors.white),
+      appBar: AppBar(title: const Text("Inventory Stock"), backgroundColor: const Color(0xFF1A237E), foregroundColor: Colors.white),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('paints').snapshots(),
         builder: (context, snapshot) {
@@ -83,16 +136,57 @@ class BrowseInventoryScreen extends StatelessWidget {
             itemCount: paints.length,
             itemBuilder: (context, index) {
               var paint = paints[index];
+              var data = paint.data() as Map<String, dynamic>;
+              
+              String hexColor = data.containsKey('hexColor') ? data['hexColor'] : '#CCCCCC'; 
+              int currentStock = data['currentStock'] ?? 0;
+              bool isOutOfStock = currentStock <= 0;
+
               return Card(
                 elevation: 2,
                 child: ListTile(
-                  title: Text(paint['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
-                  subtitle: Text("Available Stock: ${paint['currentStock']}", style: const TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                  trailing: ElevatedButton(
-                    onPressed: () => _handlePaintAction(context, paint),
-                    // Changes the main list button based on role
-                    child: Text(isAdmin ? "Quick Checkout" : "Request"),
+                  leading: Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: _hexToColor(hexColor),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.grey.shade300, width: 2), 
+                    ),
                   ),
+                  title: Text(paint['name'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18)),
+                  subtitle: Text(
+                    isOutOfStock ? "Out of Stock" : "Available Stock: $currentStock", 
+                    style: TextStyle(
+                      color: isOutOfStock ? Colors.red : Colors.green, 
+                      fontWeight: FontWeight.bold
+                    )
+                  ),
+                  
+                  // --- NEW: Separate UI for Admin vs User ---
+                  trailing: isAdmin
+                    ? Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          // Restock Button (Only Admins see this)
+                          IconButton(
+                            icon: const Icon(Icons.add_box, color: Colors.blue, size: 32),
+                            onPressed: () => _handleRestock(context, paint),
+                            tooltip: 'Restock Paint',
+                          ),
+                          const SizedBox(width: 8),
+                          // Checkout Button
+                          ElevatedButton(
+                            onPressed: isOutOfStock ? null : () => _handlePaintAction(context, paint),
+                            child: const Text("Checkout"),
+                          ),
+                        ],
+                      )
+                    // User UI (Only sees the Request button)
+                    : ElevatedButton(
+                        onPressed: isOutOfStock ? null : () => _handlePaintAction(context, paint),
+                        child: const Text("Request"),
+                      ),
                 ),
               );
             },
