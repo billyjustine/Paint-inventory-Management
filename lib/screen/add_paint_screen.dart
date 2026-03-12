@@ -4,6 +4,7 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 
 class AddPaintScreen extends StatefulWidget {
   const AddPaintScreen({super.key});
+
   @override
   State<AddPaintScreen> createState() => _AddPaintScreenState();
 }
@@ -11,79 +12,291 @@ class AddPaintScreen extends StatefulWidget {
 class _AddPaintScreenState extends State<AddPaintScreen> {
   final TextEditingController nameCtrl = TextEditingController();
   final TextEditingController stockCtrl = TextEditingController();
-  Color pickedColor = Colors.blue;
+  Color pickedColor = const Color(0xFF1A237E); // Default color
+  bool _isLoading = false;
 
-  void _savePaint() async {
-    if (nameCtrl.text.isEmpty || stockCtrl.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Please fill all fields")));
+  // --- LOGIC: SAVE TO FIREBASE ---
+  void _handleSave() async {
+    // 1. Basic Validation
+    if (nameCtrl.text.trim().isEmpty || stockCtrl.text.trim().isEmpty) {
+      _showSnackBar("Please fill out all fields", isError: true);
       return;
     }
-    
-    // Converts the chosen color into a Hex Code like #1A237E to save to the database
+
+    int? stockValue = int.tryParse(stockCtrl.text.trim());
+    if (stockValue == null) {
+      _showSnackBar("Please enter a valid number for initial stock", isError: true);
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    // Convert color to Hex String
     String hex = '#${pickedColor.value.toRadixString(16).substring(2, 8).toUpperCase()}';
-    
+
     try {
+      // 2. Save to Firestore
       await FirebaseFirestore.instance.collection('paints').add({
         'name': nameCtrl.text.trim(),
         'hexColor': hex,
-        'currentStock': int.parse(stockCtrl.text),
+        'currentStock': stockValue,
         'status': 'Available',
       });
-      if (mounted) Navigator.pop(context);
+
+      // 3. Show Success Message
+      _showSnackBar("Paint saved successfully!", isError: false);
+
+      // 4. Clear the form for the next entry
+      nameCtrl.clear();
+      stockCtrl.clear();
+      setState(() {
+        pickedColor = const Color(0xFF1A237E);
+      });
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("Error: $e"), backgroundColor: Colors.red));
+      _showSnackBar("Error saving to database: $e", isError: true);
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // --- LOGIC: COLOR PICKER DIALOG ---
+  void _openColorPicker() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text("Select Paint Color"),
+        content: SingleChildScrollView(
+          child: ColorPicker(
+            pickerColor: pickedColor,
+            enableAlpha: false,
+            onColorChanged: (color) => setState(() => pickedColor = color),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text("Done", style: TextStyle(fontWeight: FontWeight.bold)),
+          )
+        ],
+      ),
+    );
+  }
+
+  // --- LOGIC: CUSTOM SNACKBAR ---
+  void _showSnackBar(String message, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          children: [
+            Icon(
+              isError ? Icons.error_outline_rounded : Icons.check_circle_rounded,
+              color: Colors.white,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                message,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: isError ? Colors.redAccent.shade700 : Colors.green.shade600,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(20),
+        elevation: 6,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        duration: const Duration(seconds: 3),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey.shade100, // Clean background for the card to pop
       appBar: AppBar(
-        title: const Text("Add New Paint", style: TextStyle(color: Colors.white)), 
-        backgroundColor: const Color(0xFF1A237E), 
-        iconTheme: const IconThemeData(color: Colors.white)
+        title: const Text("Inventory", style: TextStyle(fontWeight: FontWeight.w600)),
+        backgroundColor: const Color(0xFF1A237E),
+        foregroundColor: Colors.white,
+        elevation: 0,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            const Text("Tap the box below to pick the paint color", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey)),
-            const SizedBox(height: 10),
-            
-            // --- THE COLOR PICKER BUTTON ---
-            InkWell(
-              onTap: () => showDialog(
-                context: context, 
-                builder: (c) => AlertDialog(
-                  content: SingleChildScrollView(child: ColorPicker(pickerColor: pickedColor, onColorChanged: (c) => setState(() => pickedColor = c))),
-                  actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text("Done"))],
-                )
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Card(
+            elevation: 8,
+            shadowColor: Colors.black12,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(24),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(28),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Colors.white, Colors.grey.shade50],
+                ),
               ),
-              child: Container(
-                height: 100, 
-                decoration: BoxDecoration(
-                  color: pickedColor,
-                  borderRadius: BorderRadius.circular(15),
-                  border: Border.all(color: Colors.grey.shade400, width: 2)
-                ), 
-                child: const Center(
-                  child: Text("  CHOOSE COLOR  ", style: TextStyle(backgroundColor: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))
-                )
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // --- HEADER ---
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A237E).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.format_paint_rounded, color: Color(0xFF1A237E)),
+                      ),
+                      const SizedBox(width: 16),
+                      const Text(
+                        "Add New Paint",
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.5,
+                          color: Color(0xFF1A237E),
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8, bottom: 24),
+                    child: Divider(height: 1, thickness: 1),
+                  ),
+
+                  // --- INPUT FIELDS ---
+                  _buildTextField(
+                    controller: nameCtrl,
+                    label: "Paint Name / Brand",
+                    icon: Icons.title_rounded,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildTextField(
+                    controller: stockCtrl,
+                    label: "Initial Stock",
+                    icon: Icons.inventory_2_rounded,
+                    isNumber: true,
+                  ),
+                  const SizedBox(height: 24),
+
+                  // --- COLOR PICKER ROW ---
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade50,
+                      border: Border.all(color: Colors.grey.shade200),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "Paint Color",
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.black87),
+                        ),
+                        InkWell(
+                          onTap: _openColorPicker,
+                          borderRadius: BorderRadius.circular(12),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 32,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: pickedColor,
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: pickedColor.withOpacity(0.4),
+                                      blurRadius: 6,
+                                      offset: const Offset(0, 2),
+                                    )
+                                  ],
+                                  border: Border.all(color: Colors.white, width: 2),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              const Icon(Icons.touch_app_rounded, size: 20, color: Colors.grey),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+
+                  // --- ACTION BUTTON ---
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF1A237E),
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      onPressed: _isLoading ? null : _handleSave,
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 24,
+                              width: 24,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+                            )
+                          : const Text(
+                              "Add to Inventory",
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                            ),
+                    ),
+                  ),
+                ],
               ),
             ),
-            
-            const SizedBox(height: 30),
-            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: "Paint Name / Brand", border: OutlineInputBorder())),
-            const SizedBox(height: 15),
-            TextField(controller: stockCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Initial Stock Quantity", border: OutlineInputBorder())),
-            const SizedBox(height: 30),
-            
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A237E), minimumSize: const Size.fromHeight(55)),
-              onPressed: _savePaint, 
-              child: const Text("SAVE TO DATABASE", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))
-            )
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // Helper widget to keep the code clean and consistent
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    bool isNumber = false,
+  }) {
+    return TextFormField(
+      controller: controller,
+      keyboardType: isNumber ? TextInputType.number : TextInputType.text,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: TextStyle(color: Colors.grey.shade600),
+        floatingLabelStyle: const TextStyle(color: Color(0xFF1A237E), fontWeight: FontWeight.w600),
+        prefixIcon: Icon(icon, color: Colors.grey.shade500, size: 22),
+        filled: true,
+        fillColor: Colors.grey.shade50,
+        contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 20),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: Colors.grey.shade200, width: 1.5),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFF1A237E), width: 2),
         ),
       ),
     );

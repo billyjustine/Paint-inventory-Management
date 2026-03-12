@@ -14,7 +14,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController emailCtrl = TextEditingController();
   final TextEditingController passCtrl = TextEditingController();
   bool isLoading = false;
-Future<void> login() async {
+
+  Future<void> login() async {
     if (emailCtrl.text.isEmpty || passCtrl.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text("Please enter both email and password."), 
@@ -24,13 +25,11 @@ Future<void> login() async {
 
     setState(() => isLoading = true);
     try {
-      // 1. Log the user in
       UserCredential cred = await FirebaseAuth.instance.signInWithEmailAndPassword(
           email: emailCtrl.text.trim(), 
           password: passCtrl.text.trim()
       );
       
-      // 2. Quickly grab their name from the database
       DocumentSnapshot userDoc = await FirebaseFirestore.instance.collection('users').doc(cred.user!.uid).get();
       
       String userName = "Staff"; 
@@ -40,17 +39,15 @@ Future<void> login() async {
       }
       
       if (mounted) {
-        // --- THE LOGIN SUCCESS MESSAGE ---
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text("Login Success! Welcome, $userName.", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
-            backgroundColor: Colors.green, // Makes the banner green for success
-            behavior: SnackBarBehavior.floating, // Makes it float above the bottom edge
-            duration: const Duration(seconds: 2), // Disappears quickly so it isn't annoying
+            backgroundColor: Colors.green, 
+            behavior: SnackBarBehavior.floating, 
+            duration: const Duration(seconds: 2), 
           )
         );
 
-        // 3. Send them to the Dashboard
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const DashboardScreen()));
       }
     } catch (e) {
@@ -64,35 +61,70 @@ Future<void> login() async {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[100], // Adds a subtle background color so the white card pops
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(30),
-          child: Column(
-            children: [
-              const Icon(Icons.inventory, size: 80, color: Color(0xFF1A237E)),
-              const SizedBox(height: 20),
-              const Text(" Paint Inventory Management", style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1A237E))),
-              const SizedBox(height: 20),
-              TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: "Email", border: OutlineInputBorder())),
-              const SizedBox(height: 15),
-              TextField(controller: passCtrl, obscureText: true, decoration: const InputDecoration(labelText: "Password", border: OutlineInputBorder())),
-              const SizedBox(height: 20),
-              isLoading ? const CircularProgressIndicator() : ElevatedButton(
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A237E), minimumSize: const Size.fromHeight(50)),
-                onPressed: login, 
-                child: const Text("LOGIN", style: TextStyle(color: Colors.white,fontSize: 20)),
+          padding: const EdgeInsets.all(24),
+          child: Card(
+            elevation: 6, // Adds a nice drop shadow
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.inventory, size: 80, color: Color(0xFF1A237E)),
+                  const SizedBox(height: 15),
+                  const Text("WELCOME BACK", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1A237E))),
+                  const SizedBox(height: 5),
+                  const Text("Paint Inventory Management", style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500)),
+                  const SizedBox(height: 35),
+                  
+                  // --- Upgraded Text Fields with Icons ---
+                  TextField(
+                    controller: emailCtrl, 
+                    decoration: InputDecoration(
+                      labelText: "Email", 
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      prefixIcon: const Icon(Icons.email, color: Colors.grey),
+                    )
+                  ),
+                  const SizedBox(height: 15),
+                  TextField(
+                    controller: passCtrl, 
+                    obscureText: true, 
+                    decoration: InputDecoration(
+                      labelText: "Password", 
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      prefixIcon: const Icon(Icons.lock, color: Colors.grey),
+                    )
+                  ),
+                  const SizedBox(height: 30),
+                  
+                  isLoading ? const CircularProgressIndicator() : ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A237E), 
+                      minimumSize: const Size.fromHeight(55),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)) // Matches text field corners
+                    ),
+                    onPressed: login, 
+                    child: const Text("LOGIN", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  const SizedBox(height: 15),
+                  TextButton(
+                    onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
+                    child: const Text("New User? Register Here", style: TextStyle(color: Color(0xFF1A237E), fontWeight: FontWeight.w600)),
+                  )
+                ],
               ),
-              TextButton(
-                onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const RegisterScreen())),
-                child: const Text("New User? Register Here"),
-              )
-            ],
+            ),
           ),
         ),
       ),
     );
   }
 }
+
 // --- REGISTER SCREEN ---
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -105,7 +137,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final TextEditingController emailCtrl = TextEditingController();
   final TextEditingController passCtrl = TextEditingController();
   
-  // Default selection
   String role = 'User'; 
   bool isLoading = false;
 
@@ -119,13 +150,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => isLoading = true);
     try {
-      // 1. Create the account in Firebase Auth
       UserCredential cred = await FirebaseAuth.instance.createUserWithEmailAndPassword(
           email: emailCtrl.text.trim(), 
           password: passCtrl.text.trim()
       );
       
-      // 2. Save the user's role and details to Firestore
       await FirebaseFirestore.instance.collection('users').doc(cred.user!.uid).set({
         'uid': cred.user!.uid,
         'name': nameCtrl.text.trim(),
@@ -134,16 +163,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
       });
       
       if (mounted) {
-        // --- NEW: Display the Success Message! ---
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text("Registration Successful! You can now log in.", style: TextStyle(fontWeight: FontWeight.bold)), 
             backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating, // Makes it pop up slightly above the bottom
+            behavior: SnackBarBehavior.floating, 
           )
         );
         
-        // 3. Send them to the Login Screen
         Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen()));
       }
     } catch (e) {
@@ -151,25 +178,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(e.toString()), backgroundColor: Colors.red));
     }
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[100], // Matches the login screen background
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Card(
-            elevation: 4,
+            elevation: 6, // Matches login shadow
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             child: Padding(
-              padding: const EdgeInsets.all(24),
+              padding: const EdgeInsets.all(32), // Increased padding for a more spacious feel
               child: Column(
                 children: [
                   const Icon(Icons.group_add, size: 60, color: Color(0xFF1A237E)),
                   const SizedBox(height: 10),
-                  const Text("CREATE ACCOUNT", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A237E))),
+                  const Text("CREATE ACCOUNT", style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF1A237E))),
                   const SizedBox(height: 25),
 
-                  // --- NEW PREMIUM ROLE SELECTOR DESIGN ---
                   const Align(
                     alignment: Alignment.centerLeft,
                     child: Text("1. SELECT ACCOUNT TYPE", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12)),
@@ -230,29 +258,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     child: Divider(),
                   ),
 
-                  // --- TEXT FIELDS ---
                   const Align(
                     alignment: Alignment.centerLeft,
                     child: Text("2. USER DETAILS", style: TextStyle(fontWeight: FontWeight.bold, color: Colors.grey, fontSize: 12)),
                   ),
                   const SizedBox(height: 10),
-                  TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: "Full Name", border: OutlineInputBorder(), prefixIcon: Icon(Icons.badge))),
+                  TextField(
+                    controller: nameCtrl, 
+                    decoration: InputDecoration(labelText: "Full Name", border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), prefixIcon: const Icon(Icons.badge, color: Colors.grey))
+                  ),
                   const SizedBox(height: 15),
-                  TextField(controller: emailCtrl, decoration: const InputDecoration(labelText: " Email", border: OutlineInputBorder(), prefixIcon: Icon(Icons.email))),
+                  TextField(
+                    controller: emailCtrl, 
+                    decoration: InputDecoration(labelText: "Email", border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), prefixIcon: const Icon(Icons.email, color: Colors.grey))
+                  ),
                   const SizedBox(height: 15),
-                  TextField(controller: passCtrl, obscureText: true, decoration: const InputDecoration(labelText: "Password", border: OutlineInputBorder(), prefixIcon: Icon(Icons.lock))),
+                  TextField(
+                    controller: passCtrl, 
+                    obscureText: true, 
+                    decoration: InputDecoration(labelText: "Password", border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), prefixIcon: const Icon(Icons.lock, color: Colors.grey))
+                  ),
                   const SizedBox(height: 25),
                   
-                  // --- ACTIONS ---
                   isLoading ? const CircularProgressIndicator() : ElevatedButton(
-                    style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1A237E), minimumSize: const Size.fromHeight(55)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF1A237E), 
+                      minimumSize: const Size.fromHeight(55),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))
+                    ),
                     onPressed: register, 
                     child: const Text("REGISTER", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
                   const SizedBox(height: 10),
                   TextButton(
                     onPressed: () => Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => const LoginScreen())),
-                    child: const Text("Already have an account? Login", style: TextStyle(color: Color(0xFF1A237E))),
+                    child: const Text("Already have an account? Login", style: TextStyle(color: Color(0xFF1A237E), fontWeight: FontWeight.w600)),
                   )
                 ],
               ),
