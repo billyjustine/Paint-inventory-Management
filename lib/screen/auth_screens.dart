@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dashboard_screen.dart';
+import 'dashboard_screen.dart'; // Make sure this path is correct for your app
 
 // --- LOGIN SCREEN ---
 class LoginScreen extends StatefulWidget {
@@ -14,6 +14,9 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController emailCtrl = TextEditingController();
   final TextEditingController passCtrl = TextEditingController();
   bool isLoading = false;
+  
+  // 1. Added state for password visibility on Login
+  bool _isPasswordVisible = false;
 
   Future<void> login() async {
     if (emailCtrl.text.isEmpty || passCtrl.text.isEmpty) {
@@ -61,12 +64,12 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100], // Adds a subtle background color so the white card pops
+      backgroundColor: Colors.grey[100], 
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Card(
-            elevation: 6, // Adds a nice drop shadow
+            elevation: 6, 
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             child: Padding(
               padding: const EdgeInsets.all(32),
@@ -80,7 +83,6 @@ class _LoginScreenState extends State<LoginScreen> {
                   const Text("Paint Inventory Management", style: TextStyle(fontSize: 14, color: Colors.grey, fontWeight: FontWeight.w500)),
                   const SizedBox(height: 35),
                   
-                  // --- Upgraded Text Fields with Icons ---
                   TextField(
                     controller: emailCtrl, 
                     decoration: InputDecoration(
@@ -90,13 +92,26 @@ class _LoginScreenState extends State<LoginScreen> {
                     )
                   ),
                   const SizedBox(height: 15),
+                  
+                  // --- Upgraded Login Password Field ---
                   TextField(
                     controller: passCtrl, 
-                    obscureText: true, 
+                    obscureText: !_isPasswordVisible, // Ties to state
                     decoration: InputDecoration(
                       labelText: "Password", 
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                       prefixIcon: const Icon(Icons.lock, color: Colors.grey),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                          color: Colors.grey,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _isPasswordVisible = !_isPasswordVisible;
+                          });
+                        },
+                      ),
                     )
                   ),
                   const SizedBox(height: 30),
@@ -105,7 +120,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF1A237E), 
                       minimumSize: const Size.fromHeight(55),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)) // Matches text field corners
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)) 
                     ),
                     onPressed: login, 
                     child: const Text("LOGIN", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
@@ -139,6 +154,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   
   String role = 'User'; 
   bool isLoading = false;
+  
+  // 2. Added state for password visibility on Register
+  bool _isPasswordVisible = false;
 
   Future<void> register() async {
     if (emailCtrl.text.isEmpty || passCtrl.text.length < 6) {
@@ -182,15 +200,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100], // Matches the login screen background
+      backgroundColor: Colors.grey[100], 
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Card(
-            elevation: 6, // Matches login shadow
+            elevation: 6, 
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
             child: Padding(
-              padding: const EdgeInsets.all(32), // Increased padding for a more spacious feel
+              padding: const EdgeInsets.all(32), 
               child: Column(
                 children: [
                   const Icon(Icons.group_add, size: 60, color: Color(0xFF1A237E)),
@@ -273,10 +291,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     decoration: InputDecoration(labelText: "Email", border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), prefixIcon: const Icon(Icons.email, color: Colors.grey))
                   ),
                   const SizedBox(height: 15),
+                  
+                  // --- Upgraded Register Password Field ---
                   TextField(
                     controller: passCtrl, 
-                    obscureText: true, 
-                    decoration: InputDecoration(labelText: "Password", border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)), prefixIcon: const Icon(Icons.lock, color: Colors.grey))
+                    obscureText: !_isPasswordVisible, // Ties to state
+                    decoration: InputDecoration(
+                      labelText: "Password", 
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                      prefixIcon: const Icon(Icons.lock, color: Colors.grey),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                          color: Colors.grey,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _isPasswordVisible = !_isPasswordVisible;
+                          });
+                        },
+                      ),
+                    )
                   ),
                   const SizedBox(height: 25),
                   
